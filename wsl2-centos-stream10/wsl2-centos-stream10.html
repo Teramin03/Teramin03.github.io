@@ -1,9 +1,3 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>てらみん備忘録</title>
 </head>
   <style>
     body {
@@ -162,96 +156,29 @@
   </style>
 
 <body>
-  <h1>てらみん備忘録</h1>
-
-  <h2>このサイトについて</h2>
-
-  <p>
-    調べたこと、詰まったこと、二度目は調べ直したくないことを置いておく場所である。
-  </p>
-
-  <p>
-    技術についてはど素人なので、知っていて当然とされがちな前提も省略せず、初めて触れる人でも同じ手順で再現できる記録を目指す。
-  </p>
-
-  <p>
-    各記事は、手を動かして確認した範囲のみを記し、未検証の事項はその旨を明記する。
-  </p>
-
-  <p>
-    内容の正確性は保証しない。
-  </p>
-
-  <h2>記事一覧</h2>
-
-  <h3>バージョン管理</h3>
-
-  <table>
-    <tr>
-      <th>表題</th>
-      <th>内容</th>
-      <th>最終更新</th>
-    </tr>
-    <tr>
-      <td>
-        <a>Git/GitHub について</a>
-      </td>
-      <td>
-        3つの領域、コミット、ブランチとマージ、コンフリクトの解決、
-        リモートとGitHub、Pull Requestによる共同作業、詰まった点と対処
-      </td>
-      <td>yyyy/mm/dd</td>
-    </tr>
-  </table>
-
-  <h3>環境構築</h3>
-
-  <table>
-    <tr>
-      <th>表題</th>
-      <th>内容</th>
-      <th>最終更新</th>
-    </tr>
-    <tr>
-      <td>
-        <a href="./wsl2-centos-stream10/">WSL2 + CentOS Stream 10 導入について</a>
-      </td>
-      <td>
-        WSL2の仕組みと事前準備、公式WSLイメージの導入、初期設定、
-        日本語環境、Windowsとのファイルのやりとり、
-        VS Code連携、バックアップと削除
-      </td>
-      <td>yyyy/mm/dd</td>
-    </tr>
-  </table>
-
-  <h2>書く予定のもの</h2>
-
-  <p>着手した順に上へ移す。</p>
-
-  <ul>
-    <li>Git/GitHub 導入</li>
-    <li>WSL2 + CentOS Stream 9 導入</li>
-    <li>Linuxの基本的なコマンド操作</li>
-    <li>Vimの最低限の操作</li>
-    <li>GitHub Pagesでのこのサイトの運用手順</li>
-  </ul>
-
-  <h2>更新履歴</h2>
-
-  <table>
-    <tr>
-      <th>日付</th>
-      <th>内容</th>
-    </tr>
-    <tr>
-      <td>2026/08/08</td>
-      <td>サイト開設</td>
-    </tr>
-  </table>
+    <p class="note" style="margin-left:0"><a href="./index.html">てらみん備忘録</a> &gt; WSL2 + CentOS Stream 10 導入</p>
+ 
+    <h1>WSL2 + CentOS Stream 10 導入 2026</h1>
+ 
+    <h2>0. このメモについて</h2>
+ 
+    <h3>0.1. 目的</h3>
+ 
+    <p>
+    Windows上のWSL2にCentOS Stream 10を導入し、常用できる状態まで持っていくまでの記録である。
+    再構築する機会が生じた際に、同じ調査を繰り返さずに済ませることを目的とする。
+    </p>
+ 
+    <p>
+    CentOS StreamはMicrosoft Storeの一覧には並ばないが、
+    CentOSのAlternative Images SIGが<b>WSL専用のイメージ(<code>.wsl</code>ファイル)を公式に配布している</b>。
+    これを用いれば、Ubuntuをストアから入れるのとほぼ同じ手軽さで導入できる。
+    本稿はこの方法を主とする。
+    </p>
 
   <footer>
-    てらみん備忘録<br>
+    <a href="./index.html">てらみん備忘録</a> に戻る<br>
+    WSL2 + CentOS Stream 10 導入 2026<br>
     最終更新: 2026/08/08<br>
     <a href="https://x.com/Teramin_VRC" target="_blank" rel="noopener noreferrer"> 𝕏（旧ツイッター）</a>
   </footer>
