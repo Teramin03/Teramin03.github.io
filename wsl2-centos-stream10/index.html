@@ -162,25 +162,425 @@
   </style>
 
 <body>
-    <p class="note" style="margin-left:0"><a href="/">てらみん備忘録</a> &gt; WSL2 + CentOS Stream 10 導入</p>
+  <p class="note" style="margin-left:0"><a href="/">てらみん備忘録</a> &gt; WSL2 + CentOS Stream 10 導入</p>
  
-    <h1>WSL2 + CentOS Stream 10 導入 2026</h1>
+  <h1>WSL2 + CentOS Stream 10 導入 2026</h1>
  
-    <h2>0. このメモについて</h2>
+  <h2>0. この備忘録について</h2>
  
-    <h3>0.1. 目的</h3>
+  <h3>0.1. 目的</h3>
  
-    <p>
+  <p>
     Windows上のWSL2にCentOS Stream 10を導入し、常用できる状態まで持っていくまでの記録である。
     再構築する機会が生じた際に、同じ調査を繰り返さずに済ませることを目的とする。
-    </p>
+  </p>
  
-    <p>
+  <p>
     CentOS StreamはMicrosoft Storeの一覧には並ばないが、
     CentOSのAlternative Images SIGが<b>WSL専用のイメージ(<code>.wsl</code>ファイル)を公式に配布している</b>。
-    これを用いれば、Ubuntuをストアから入れるのとほぼ同じ手軽さで導入できる。
     本稿はこの方法を主とする。
+  </p>
+
+  <h3>0.2. 前提としたもの</h3>
+    <ul>
+      <li>CPUの仮想化支援機能(Intel VT-x / AMD-V)が利用できること</li>
+      <li>管理者権限でPowerShellを実行できること</li>
+      <li>Linuxの基本的なコマンド操作</li>
+    </ul>
+
+  <h3>0.3. 扱わなかったこと</h3>
+    <ul>
+      <li>WSL1。選ぶ理由が無いため、WSL2に限定した</li>
+      <li>Docker等のコンテナ実行環境。使用していない</li>
+      <li>Hyper-V上に仮想マシンを立てる方式</li>
+    </ul>
+
+  <h3>0.4. 表記について</h3>
+    <ul>
+      <li><code>PS&gt;</code> で始まる行はWindows PowerShell(管理者)への入力である</li>
+      <li><code>$</code> で始まる行はCentOS側のシェルへの入力、<code>#</code> はroot権限での実行を示す</li>
+      <li><code>&lt;...&gt;</code> で囲んだ箇所は自分の値に置き換える</li>
+      <li>各節末尾の枠は、実際に手元で実行して確認した内容の記録である</li>
+    </ul>
+
+  <h3>0.5. 作業した環境</h3>
+    <table>
+      <tr><th>項目</th><th>値</th></tr>
+      <tr><td>ホスト</td><td>Windows 11 25H2</td></tr>
+      <tr><td>WSL</td><td>2.6系(<code>wsl --version</code> で確認)</td></tr>
+      <tr><td>イメージ</td><td>CentOS-Stream-Image-WSL-Base.x86_64-10-202604020202.wsl</td></tr>
+    </table>
+
+  <p class="note">
+    CentOS Stream 9 のサポート終了は2027年5月末である。
+    CentOS Stream 10 のサポート終了は2030年頃である。
+  </p>
+
+  <h2>目次</h2>
+
+  <table>
+    <tr><th>節</th><th>内容</th><th>主な操作</th><th>確認</th></tr>
+    <tr><td>1</td><td><a href="#s1">WSL2の仕組みと事前準備</a></td><td>BIOS, Windowsの機能</td><td><a href="#ex01">確認01</a></td></tr>
+    <tr><td>2</td><td><a href="#s2">WSL本体の導入と更新</a></td><td><code>wsl --update</code></td><td><a href="#ex02">確認02</a></td></tr>
+    <tr><td>3</td><td><a href="#s3">CentOS StreamのWSLイメージ</a></td><td>ダウンロード</td><td><a href="#ex03">確認03</a></td></tr>
+    <tr><td>4</td><td><a href="#s4">導入と初回起動</a></td><td><code>wsl --install</code></td><td><a href="#ex04">確認04</a></td></tr>
+    <tr><td>5</td><td><a href="#s5">初期設定の確認</a></td><td><code>passwd</code></td><td><a href="#ex05">確認05</a></td></tr>
+    <tr><td>9</td><td><a href="#s6">Visual Studio Codeとの連携</a></td><td><code>code .</code></td><td><a href="#ex06">確認06</a></td></tr>
+    <tr><td>7</td><td><a href="#s7">バックアップ・削除</a></td><td><code>wsl --export</code>, <code>--unregister</code></td><td><a href="#ex07">確認7</a></td></tr>
+    <tr><td>8</td><td><a href="#faq">詰まった点と対処</a></td><td>&mdash;</td><td>&mdash;</td></tr>
+  </table>
+
+  <hr>
+
+  <h2 id="s1">1. WSL2の仕組みと事前準備</h2>
+
+  <h3>1.1. WSL1とWSL2の相違</h3>
+    <p>
+      WSL1はLinuxのシステムコールをWindowsカーネルの呼び出しに変換する方式であった。
+      WSL2はこれを改め、仮想マシン上で<b>本物のLinuxカーネルを動作させる</b>方式となっている。
     </p>
+
+  <table>
+    <tr><th></th><th>WSL1</th><th>WSL2</th></tr>
+    <tr><td>方式</td><td>システムコールの変換</td><td>仮想マシン + Linuxカーネル</td></tr>
+    <tr><td>互換性</td><td>低い。動作しないものがある</td><td>高い</td></tr>
+    <tr><td>Linux側の性能</td><td>低い</td><td>高い</td></tr>
+    <tr><td>Windows側ファイルの読み書き</td><td>速い</td><td>遅い</td></tr>
+  </table>
+
+  <p>
+    本物のカーネルが動くということは、<code>systemd</code> やコンテナも動作するということである。
+  </p>
+
+  <h3>1.2. 仮想化支援機能(VT-x / AMD-V)の有効化</h3>
+
+  <p>
+    近年のコンピュータでは既定で有効になっていることが多いが、無効の場合はBIOS(UEFI)設定画面で有効にする。
+    入り方は機種により異なるが、起動時に <code>Del</code> または <code>F2</code> の連打で入れる場合が多い。
+    項目名はIntel CPUで「Intel VT-x」、AMD CPUで「AMD-V」または「SVM Mode」である。
+  </p>
+
+  <h3>1.3. Windowsの機能の有効化</h3>
+
+  <p>
+    「Windowsの機能の有効化または無効化」にて次の2つを有効にし、再起動する。
+  </p>
+
+  <ul>
+    <li>Linux用Windowsサブシステム</li>
+    <li>仮想マシン プラットフォーム</li>
+  </ul>
+
+  <p class="note">
+    検索バー（コントロールパネルと入力） &gt; コントロールパネル &gt; プログラム &gt; Windowsの機能の有効化または無効化
+  </p>
+
+  <div class="ex" id="ex01">
+    <p><b>確認01</b></p>
+    <p>
+      タスクマネージャーのCPUの項に「仮想化: 有効」と表示されることを確認した。
+    </p>
+  </div>
+
+  <hr>
+
+  <h2 id="s2">2. WSL本体の導入と更新</h2>
+
+  <h3>2.1. 先に更新しておく</h3>
+
+  <p>
+    古い <code>wsl.exe</code> のまま作業を進めると、既定がWSL1のままであったり、
+    後述の <code>--install --from-file</code> が使えなかったりする。
+    <b>イメージを入れる前に更新を済ませる</b>
+  </p>
+
+  <pre><code>
+    PS&gt; wsl --update
+    PS&gt; wsl --version
+  </code></pre>
+
+  <h3>2.2. 主なコマンド</h3>
+
+  <table>
+    <tr><th>コマンド</th><th>意味</th></tr>
+    <tr><td><code>wsl --list -v</code></td><td>登録済みの一覧と、各々のWSLバージョン・状態</td></tr>
+    <tr><td><code>wsl -d &lt;名前&gt;</code></td><td>指定したものを起動</td></tr>
+    <tr><td><code>wsl --set-default &lt;名前&gt;</code></td><td>既定のディストリビューションを設定</td></tr>
+    <tr><td><code>wsl --shutdown</code></td><td>WSL全体を停止する。</td></tr>
+    <tr><td><code>wsl --status</code></td><td>既定のバージョン等の状態表示</td></tr>
+  </table>
+
+  <div class="ex" id="ex02">
+    <p><b>確認02</b></p>
+    <p>
+      <code>wsl --update</code> の後に <code>wsl --version</code> を実行し、
+      WSL本体・カーネル・WSLgの各バージョンが表示されることを確認した。
+    </p>
+  </div>
+
+  <hr>
+
+  <h2 id="s3">3. CentOS StreamのWSLイメージ</h2>
+
+  <h3>3.1. 公式イメージの存在</h3>
+
+  <p>
+    Microsoft StoreにはUbuntu, Debian等が並ぶが、
+    <b>CentOS Streamは含まれない</b>。
+  </p>
+
+  <p>
+    CentOSプロジェクトのAlternative Images SIGが、
+    Live ISO等と並んで<b>WSL専用のイメージを配布している</b>。
+    Stream 9 と Stream 10 の双方、x86_64 と aarch64 の双方が用意されている。
+  </p>
+
+  <h3>3.2. 入手先</h3>
+
+  <p>
+    最新版へのリンクは
+    <a href="https://www.centos.org/altimages/">CentOS Alternative Images</a> のページにある。
+  </p>
+
+  <h3>3.3. <code>.wsl</code> とは何か</h3>
+
+  <p>
+    <code>.wsl</code> は、WSLがディストリビューションを配布するための形式である。
+  </p>
+
+  <p>
+    Windows側でこの拡張子がWSLに関連付けられているため、
+    <b>ダウンロードしてダブルクリックするだけで導入が完了する</b>。
+  </p>
+
+  <h3>3.4. イメージに含まれるもの</h3>
+
+  <p>
+    必要なものは概ね揃っている。
+  </p>
+
+  <table>
+    <tr><th>分類</th><th>主なもの</th></tr>
+    <tr><td>基本</td><td>systemd, dnf, yum, rpm, bash, coreutils, util-linux, sed, findutils, tar</td></tr>
+    <tr><td>ユーザ管理</td><td>sudo, passwd, shadow-utils, pam</td></tr>
+    <tr><td>運用</td><td>procps-ng, hostname, iproute相当, openssh-server, curl(minimal)</td></tr>
+    <tr><td>その他</td><td>python3, vim-minimal, tzdata, ca-certificates, wsl-setup</td></tr>
+  </table>
+
+  <p>
+    逆に、<b>入っていないもの</b>で最初に気になったのは次である。6. で補う。
+  </p>
+
+  <ul>
+    <li>日本語ロケール(英語の最小構成のみ入っている)</li>
+  </ul>
+
+  <div class="ex" id="ex03">
+    <p><b>確認03</b></p>
+    <p>
+      Alternative Imagesのページから x86_64 用の <code>.wsl</code> を取得した。
+      サイズは概ね1GB台であった。
+    </p>
+  </div>
+
+  <hr>
+
+  <h2 id="s4">4. 導入と初回起動</h2>
+
+  <h3>4.1. ダブルクリックによる導入</h3>
+
+  <p>
+    ブラウザのダウンロード一覧から「ファイルを開く」を押下するか、
+    エクスプローラでファイルをダブルクリックする。
+    Windowsが内容を取り込み、登録まで自動で済ませる。
+  </p>
+
+  <p>
+    この場合、登録名は既定の <code>CentOSStream-10-Alt</code> となる。
+  </p>
+
+  <h3>4.2. 初回起動</h3>
+
+  <pre><code>
+    PS&gt; wsl -d CentOSStream-10-Alt
+  </code></pre>
+
+  <p>
+    初回のみ、<b>ユーザ名を尋ねられる</b>。
+    ここで入力した名前で一般ユーザが作られ、以後の起動ではそのユーザで始まる。
+    スタートメニューにも登録名の項目が追加されるため、そこからも起動できる。
+  </p>
+
+  <blockquote>
+    <p>
+      作られたユーザには<b>パスワードが設定されておらず、sudoが無条件に通る</b>。
+    </p>
+  </blockquote>
+
+  <p>
+    手軽ではあるが、<code>sudo rm -rf</code> の類を確認なしで実行できてしまうということでもある。
+    気になるならパスワードを設定する(5.1 参照)。
+  </p>
+
+  <h3>4.3. まず更新する</h3>
+
+  <pre><code>
+    $ sudo dnf -y update
+  </code></pre>
+
+  <p>
+    イメージはビルド時点で固定されているため、多くの場合更新が溜まっている。
+    以降の作業のためにも、最初に済ませておく。
+  </p>
+
+  <div class="ex" id="ex04">
+    <p><b>確認04</b></p>
+    <p>
+      <code>wsl --list -v</code> の VERSION が 2 と表示されることを確認した。
+      初回起動でユーザ名を尋ねられ、入力後にそのユーザのプロンプトで始まった。
+    </p>
+  </div>
+
+  <hr>
+
+  <h2 id="s5">5. 初期設定の確認</h2>
+
+  <p>
+    イメージ側で概ね設定済みであるため、この節は「確認と微調整」が中心となる。
+  </p>
+
+  <h3>5.1. パスワードとsudo</h3>
+
+  <p>
+    4.2 の通り、初期状態ではパスワードが未設定であるため設定する。
+  </p>
+
+  <pre><code>
+    $ sudo passwd &lt;ユーザ名&gt;
+  </code></pre>
+
+  <h3>5.2. 日本語環境</h3>
+
+  <p>
+    イメージには英語の最小構成しか入っていない。日本語表示が必要であれば言語パックを追加する。
+  </p>
+
+  <pre><code>
+    $ sudo dnf -y install langpacks-ja langpacks-en
+    $ sudo localectl set-locale LANG=ja_JP.UTF-8
+  </code></pre>
+
+  <p class="note">
+    英語ロケールも併せて入れておく。
+    日本語のみとした場合、思わぬ箇所で不具合が出ることがある。
+  </p>
+
+  <h3>5.3. タイムゾーン</h3>
+
+  <pre><code>
+    $ sudo timedatectl set-timezone Asia/Tokyo
+    $ date
+  </code></pre>
+
+  <div class="ex" id="ex05">
+    <p><b>確認05</b></p>
+    <p>
+      言語パックを導入して <code>LANG=ja_JP.UTF-8</code> を設定し、
+      <code>date</code> の出力が日本語かつJSTとなることを確認した。
+    </p>
+  </div>
+
+  <hr>
+
+  <h2 id="s6">6. Visual Studio Codeとの連携</h2>
+
+  <h3>6.1. 設定</h3>
+
+  <p>
+    VS CodeはWindows側にインストールする。
+    Linux側には入れない。拡張機能「WSL」を追加すると連携が有効になる。
+  </p>
+
+  <pre><code>
+    $ cd ~/work
+    $ code .
+  </code></pre>
+
+  <p>
+    初回はサーバ側の構成要素がLinux側に自動で導入される。
+    以後、編集・ターミナル・デバッグの全てがVS Codeの画面内で完結する。
+    ターミナルは「ターミナル &gt; 新しいターミナル」で開くと、
+    CentOS側のシェルがそのまま現れる。
+  </p>
+
+  <div class="ex" id="ex06">
+    <p><b>確認06</b></p>
+    <p>
+      Windows側にVS Codeと拡張機能「WSL」を導入し、
+      CentOS側で <code>code .</code> を実行してWSL接続の状態で開くことを確認した。
+    </p>
+  </div>
+
+  <hr>
+
+  <h2 id="s7">7. バックアップ・削除</h2>
+
+  <h3>7.1. 書き出しと取り込み</h3>
+
+  <p>
+    環境全体を1つのtarに固められる。
+    これがそのままバックアップになる。
+  </p>
+
+  <pre><code>
+    PS&gt; mkdir C:\wslbackup
+    PS&gt; wsl --export CentOSStream-10-Alt C:\wslbackup\cs10.tar
+  </code></pre>
+
+  <p>
+    危険な変更を試す前に書き出しておけば、失敗しても登録し直すだけで戻せる。
+  </p>
+
+  <h3>7.2. 削除</h3>
+
+  <pre><code>
+    PS&gt; wsl --list -v
+    PS&gt; wsl --unregister CentOSStream-10-Alt
+  </code></pre>
+
+  <p>
+    <b><code>--unregister</code> は仮想ディスクごと消去する。確認は求められない。</b>
+    実行前に書き出しの有無を確認すること。
+    Windowsのアプリ一覧からのアンインストール作業は生じない。
+  </p>
+
+  <div class="ex" id="ex07">
+    <p><b>確認7</b></p>
+    <p>
+      <code>wsl --export</code> でtarを作成できた。
+      <code>wsl --unregister</code> で削除した。
+    </p>
+  </div>
+
+  <hr>
+
+  <h2 id="faq">8. 詰まった点と対処</h2>
+
+  <h3>8.1. sudoがパスワードを要求しない</h3>
+
+  <p>
+    不具合ではなく、イメージの仕様である(4.2 参照)。
+    気になる場合は <code>passwd</code> でパスワードを設定
+  </p>
+
+  <h3>8.2. 設定を変えたのに反映されない</h3>
+
+  <p>環境変数は新しいシェルの起動時に読まれるため、再起動が必要</p>
+
+  <pre><code>
+    PS&gt; wsl --shutdown
+    PS&gt; wsl
+  </code></pre>
 
   <footer>
     <a href="/">てらみん備忘録</a> に戻る<br>
